@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Commencement Speech Topics</title>
+<style>
+
+body, h1, h2 {
+    color: #444;
+    font-family: 'Helvetica Neue', Helvetica, sans-serif;
+    font-weight: 300;
+}
+#topics {
+    float: left;
+    position: relative;
+}
+#words {
+    float: left;
+    margin-bottom: 20px;
+}
+
+.link {
+  fill: none;
+  stroke: #666;
+  stroke-width: 1.5px;
+}
+
+.node circle {
+  fill: #ccc;
+  stroke: #fff;
+  stroke-width: 1.5px;
+}
+
+text {
+  font: 10px sans-serif;
+  pointer-events: none;
+}
+
+</style>
+
+<body>
+      <div id='container'>
+        <div id='topics'></div>
+        <div id='words'></div>
+    </div>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script>
+
+//Data
+var links = [
+  {source: "General advice", target: "George Saunders", value: "0.669086817"},
+  {source: "General advice", target: "Conan O'Brien", value: "0.488585593"},
+  {source: "General advice", target: "Bradley Whitford", value: "0.563778748"},
+  {source: "General advice", target: "Toni Morrison", value: "0.437910846"},
+  {source: "General advice", target: "David Foster Wallace", value: "0.372473051"},
+  {source: "General advice", target: "Steve Jobs", value: "0.729671909"},
+  {source: "General advice", target: "Stephen Colbert", value: "0.528649283"},
+  {source: "General advice", target: "Barbara Kingsolver", value: "0.456591375"},
+  {source: "General advice", target: "JK Rowling", value: "0.354093095"},
+  {source: "General advice", target: "Robert Krulwich", value: "0.55702826"},
+  {source: "Comedy, Television", target: "Conan O'Brien", value: "0.510345933"},
+  {source: "Politics, Community and Social Issues", target: "Bradley Whitford", value: "0.395766357"},
+  {source: "Comedy, Television", target: "Stephen Colbert", value: "0.471010538"},
+  {source: "Happiness and the Frustrations of Daily Life", target: "Toni Morrison", value: "0.059804627"},
+  {source: "Happiness and the Frustrations of Daily Life", target: "David Foster Wallace", value: "0.625032302"},
+  {source: "Happiness and the Frustrations of Daily Life", target: "George Saunders", value: "0.291980276"},
+  {source: "Failure, Success and Happiness", target: "Steve Jobs", value: "0.268922337"},
+  {source: "The State of Journalism", target: "Robert Krulwich", value: "0.441945837"},
+  {source: "Failure, Success and Happiness", target: "Toni Morrison", value: "0.501956802"},
+  {source: "Politics, Community and Social Issues", target: "Barbara Kingsolver", value: "0.542419228"},
+  {source: "Failure, Success and Happiness", target: "JK Rowling", value: "0.633152316"}
+];
+
+var labelFill = '#444';
+var adjLabelFill = '#aaa';
+var edgeStroke = '#aaa';
+var nodeFill = '#ccc';
+var nodeRadius = 25;
+var selectedNodeRadius = 50;
+var color = d3.scale.category20();
+
+// Find the main graph container.
+
+var topics = d3.select('#topics').attr("align","left");
+
+// Create the SVG container for the visualization and
+// define its dimensions.
+
+var svg = topics.append('svg')
+    .attr('width', width)
+    .attr('height', height);
+
+// Select the container for the notes and dimension it.
+
+var words = d3.select('#words')
+    .style({
+        'width': 620-width + 'px',
+        'height': height + 'px'
+    });
+
+var positionEdge = function(edge, nodes) {
+    edge.attr('x1', function(d) {
+        return nodes ? nodes[d.source].x : d.source.x;
+    }).attr('y1', function(d) {
+        return nodes ? nodes[d.source].y : d.source.y;
+    }).attr('x2', function(d) {
+        return nodes ? nodes[d.target].x : d.target.x;
+    }).attr('y2', function(d) {
+        return nodes ? nodes[d.target].y : d.target.y;
+    });
+};
+
+// Utility function to update the position properties
+// of an arbitrary node that's part of a D3 selection.
+
+var positionNode = function(node) {
+    node.attr('transform', function(d) {
+        return 'translate(' + d.x + ',' + d.y + ')';
+    });
+};
+
+var positionLabelText = function(text, pseudonode, fillColor) {
+
+    // What's the width of the text element?
+
+    var textWidth = text.getBBox().width;
+
+    // How far is the pseudo-node from the real one?
+
+    var diffX = pseudonode.x - pseudonode.node.x;
+    var diffY = pseudonode.y - pseudonode.node.y;
+    var dist = Math.sqrt(diffX * diffX + diffY * diffY);
+
+    // Shift in the x-direction a fraction of the text width
+
+    var shiftX = textWidth * (diffX - dist) / (dist * 2);
+    shiftX = Math.max(-textWidth, Math.min(0, shiftX));
+
+    var shiftY = pseudonode.node.selected ? selectedNodeRadius : nodeRadius;
+    shiftY = 0.5 * shiftY * diffY/Math.abs(diffY);
+
+    var select = d3.select(text);
+    if (fillColor) {
+        select = select.transition().style('fill', fillColor);
+    }
+    select.attr('transform', 'translate(' + shiftX + ',' + shiftY + ')');
+};
+
+
+var nodes = {};
+
+// Compute the distinct nodes from the links.
+links.forEach(function(link) {
+  link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
+  link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
+});
+
+var width = 800,
+    height = 500;
+
+var force = d3.layout.force()
+    .nodes(d3.values(nodes))
+    .links(links)
+    .size([width, height])
+    .linkDistance(60)
+    .charge(-300)
+    .on("tick", tick)
+    .start();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var link = svg.selectAll(".link")
+    .data(force.links())
+  .enter().append("line")
+    .attr("class", "link");
+
+var node = svg.selectAll(".node")
+    .data(force.nodes())
+  .enter().append("g")
+    .attr("class", "node")
+    .on("mouseover", mouseover)
+    .on("mouseout", mouseout)
+    .call(force.drag);
+
+node.append("circle")
+    .attr("r", 8)
+    .style("fill", function(d) { return color(d.name); });
+
+node.append("text")
+    .attr("x", 12)
+    .attr("dy", ".35em")
+    .text(function(d) { return d.name; });
+
+function tick() {
+  link
+      .attr("x1", function(d) { return d.source.x; })
+      .attr("y1", function(d) { return d.source.y; })
+      .attr("x2", function(d) { return d.target.x; })
+      .attr("y2", function(d) { return d.target.y; });
+
+  node
+      .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
+}
+
+function mouseover() {
+  d3.select(this).select("circle").transition()
+      .style("fill", "gold")
+      .duration(750)
+      .attr("r", 16);
+}
+
+function mouseout() {
+  d3.select(this).select("circle").transition()
+      .style("fill", function(d) { return color(d.name); })
+      .duration(750)
+      .attr("r", 8);
+}
+
+</script>
